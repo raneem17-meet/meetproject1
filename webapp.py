@@ -1,7 +1,14 @@
 from flask import Flask, render_template, request, redirect, url_for
 from database import *
+from flask import session as login_session
 
 app = Flask(__name__)
+
+def verify_password(email,password):
+	user = session.query(user).filter_by(email=email).first()
+	if not user or not user.verify_password(password):
+		return False
+	return True
 
 @app.route('/')
 def mainpage():
@@ -17,20 +24,32 @@ def aboutus():
 def signin():
 	if request.method == 'GET':
 		return render_template('signin.html')
-	else:
-		new_email = request.form['email']
-		new_password = request.form['password']
-
-		users = session.query(Users).filter_by(email = new_email, password=new_password).all()
-		if(len(users) == 0):
-			return redirect(url_for('signin.html'))
+	elif request.method =='POST':
+		email= request.form['email']
+		password= request.form ['password']
+		if email is None or password is None:
+			flash('Missing Arguments')
+			return redirect(url_for('signin'))
+		if verify_password(email,password):
+			user=session.query(user).filter_by(email=email).one()
+			flash('Login Successful,welcome,%s' % user.name)
+			login_session['name']=user.name
+			login_session['email']=user.email
+			login_session['id']=user.id
+			return redirect(url_for('signin'))
 		else:
-			flask_session['user_email'] = new_email
-	return render_template("signin.html")
+			flash('Incorrect username/password combination')
+			return redirect(url_for('signin'))
 	
 @app.route('/signout')
 def signgout():
-	session.pop('user_id', None)
+	if 'id' not in login_session:
+		flash('you msut be logged in order to log out ')
+		return redirect(url_for('signin'))
+	del login_session['name']
+	del login_session['email']
+	del login_session['id']
+	flash('Logged Out Successfully')
 	return redirect(url_for('mainpage'))
 
 
